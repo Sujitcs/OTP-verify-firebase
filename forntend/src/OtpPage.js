@@ -10,7 +10,7 @@ const OtpPage = ({ setUserAuthenticated, setAuthToken }) => {
   const [loading, setLoading] = useState(false);
   const [receivedOtp, setReceivedOtp] = useState("");
 
-  const API_URL = "http://localhost:5000";
+  const API_URL = "https://otp-verify-firebase-fcm-node.onrender.com";
 
   const onSignup = async () => {
     if (phone.length !== 10) {
