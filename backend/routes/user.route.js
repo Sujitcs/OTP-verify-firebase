@@ -50,7 +50,7 @@ const generateOtp = () => Math.floor(100000 + Math.random() * 900000).toString()
 
 // 1. Create OTP and Send via FCM
 userrouter.post("/create-otp", async (req, res) => {
-  const fcmToken = process.env.fcmToken;
+  const fcmToken="cH5iPsVLoH_24ysW1PDPfU:APA91bE9UX6WuRYI_iSWyEastR6QZOcrD6wyUBbAmkVrHUeljgQRaOkPBLsorAYNEykzr63bDES9nMSLnBRUawnh5Jlu389hBFYPYGsi1C99I_2V5TwqQUI";
   try {
     const { phone } = req.body;
 

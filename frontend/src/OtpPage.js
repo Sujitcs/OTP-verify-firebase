@@ -9,36 +9,40 @@ const OtpPage = ({ setUserAuthenticated, setAuthToken }) => {
   const [showOTP, setShowOTP] = useState(false);
   const [loading, setLoading] = useState(false);
   const [receivedOtp, setReceivedOtp] = useState("");
+  const [error, setError] = useState("");
 
-  const API_URL = "https://otp-verify-firebase-fcm-node.onrender.com";
+
+  const API_URL = "http://localhost:5000";
 
   const onSignup = async () => {
     if (phone.length !== 10) {
-      console.log("Invalid phone number:", phone);
+      setError("Invalid phone number. Please enter a valid 10-digit number.");
       return;
     }
     setLoading(true);
+    setError("");
+  
     try {
-      console.log("Sending OTP to:", phone);
       const response = await axios.post(
         `${API_URL}/api/create-otp`,
         { phone },
         { headers: { "Content-Type": "application/json" } }
       );
-      console.log("OTP Sent Response:", response.data);
+  
       if (response.data.otp) {
         setReceivedOtp(response.data.otp);
+        setShowOTP(true);
+      } else {
+        setError("Failed to send OTP. Please try again.");
       }
-      setShowOTP(true);
-      console.log("otpp", response.data.otp);
     } catch (error) {
-      console.error(
-        "API Error:",
-        error.response ? error.response.data : error.message
+      setError(
+        error.response?.data?.message || "An error occurred. Please try again."
       );
     }
     setLoading(false);
   };
+  
 
   const onResendOtp = () => {
     console.log("Resending OTP...");
@@ -47,67 +51,65 @@ const OtpPage = ({ setUserAuthenticated, setAuthToken }) => {
 
   const onOTPVerify = async () => {
     if (otp.length !== 6) {
-      console.log("Invalid OTP entered:", otp);
+      setError("Invalid OTP. Please enter a 6-digit code.");
       return;
     }
     setLoading(true);
+    setError("");
+  
     try {
-      console.log("Verifying OTP for phone:", phone, "OTP:", otp);
       const response = await axios.post(`${API_URL}/api/verify-otp`, {
         phone,
         otp,
       });
-      console.log("OTP Verification Response:", response.data);
-
+  
       if (response.data.message === "OTP verified successfully") {
-        console.log("OTP verified successfully. Logging in...");
-        const loginResponse = await axios.post(`${API_URL}/api/login`, {
-          phone,
-        });
-        console.log("Login Response:", loginResponse.data);
-
+        const loginResponse = await axios.post(`${API_URL}/api/login`, { phone });
+  
         if (loginResponse.data.message === "Login successful") {
           const token = loginResponse.data.token;
-          console.log("Login successful. Token received:", token);
           localStorage.setItem("authToken", token);
           setAuthToken(token);
           setUserAuthenticated(true);
         } else {
-          console.log("Login failed:", loginResponse.data.message);
+          setError("Login failed. Please try again.");
         }
       } else {
-        console.log("OTP verification failed:", response.data.message);
+        setError("OTP verification failed. Please check and try again.");
       }
     } catch (error) {
-      console.error(
-        "Error verifying OTP:",
-        error.response ? error.response.data : error.message
+      setError(
+        error.response?.data?.message || "An error occurred. Please try again."
       );
     }
     setLoading(false);
   };
+  
   const handlePhoneChange = (e) => {
     let input = e.target.value.replace(/\D/g, ""); // Remove non-numeric characters
-
+  
     // Check if input starts with 0 or 1
     if (/^[01]/.test(input)) {
       return;
     }
-
-    // Check if input starts with consecutive identical numbers (e.g., 000, 111, 999)
-    if (/^(\d)\1+/.test(input)) {
-      return; // Prevent setting numbers that start with repeated digits
+  
+    // Check if input contains five or more consecutive identical digits
+    if (/(.)\1{4,}/.test(input)) {
+      return; // Prevent setting numbers that have 5 or more repeated digits
     }
-
+  
     if (input.length <= 10) {
       setPhone(input); // Update state only if it passes validation
     }
   };
+  
 
   return (
     <section className="containerStyle">
       <div className="boxStyle">
         <h2>OTP verify with Firebase</h2>
+        <h4 className="error">{error ? error : " "}</h4>
+
         {showOTP ? (
           <div className="otpContainerStyle">
             <label>Your OTP is {receivedOtp}</label>

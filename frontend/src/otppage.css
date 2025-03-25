@@ -155,4 +155,6 @@
     opacity: 0.5;
     cursor: not-allowed;
   }
-    
+  .error{
+    color: #e10e0e;
+  }

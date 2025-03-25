@@ -4,7 +4,7 @@ import './dashboard.css';
 const Dashboard = ({ setUserAuthenticated, setAuthToken }) => {
   const [data, setData] = useState(null);
   const authToken = localStorage.getItem("authToken");
-  const API_URL='https://otp-verify-firebase-fcm-node.onrender.com';
+  const API_URL='http://localhost:5000';
 
   useEffect(() => {
     if (authToken) {
