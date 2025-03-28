@@ -140,11 +140,12 @@
     background-color: #ffffff;
     color: #333;
     transition: all 0.3s ease-in-out;
+    outline: none;
   }
   
   .otp-input:focus {
-    border-color: #ff9800;
-    box-shadow: 0px 0px 10px rgba(255, 152, 0, 0.6);
+    border-color: #045954;
+    box-shadow: 0px 0px 10px rgba(0, 255, 187, 0.6);
   }
   
   .otp-input:hover {

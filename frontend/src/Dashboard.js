@@ -4,7 +4,7 @@ import './dashboard.css';
 const Dashboard = ({ setUserAuthenticated, setAuthToken }) => {
   const [data, setData] = useState(null);
   const authToken = localStorage.getItem("authToken");
-  const API_URL='https://otp-verify-firebase-fcm-node.onrender.com';
+  const API_URL='http://localhost:5000';
 
   useEffect(() => {
     if (authToken) {
@@ -34,8 +34,15 @@ const Dashboard = ({ setUserAuthenticated, setAuthToken }) => {
   <div className="dashboard-box">
     <h1 className="dashboard-title">Dashboard</h1>
     <p className="dashboard-message">
-      {data && <span>{JSON.stringify(data)}</span>}
-    </p>
+  {data ? (
+    <span>
+      <strong>Hello, </strong> {data.Hello}
+    </span>
+  ) : (
+    <span>Loading...</span>
+  )}
+</p>
+
   </div>
   <button onClick={handleLogout} className="logout-button">Logout</button>
 </div>

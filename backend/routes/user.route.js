@@ -4,6 +4,7 @@ const jwt = require('jsonwebtoken');
 require('dotenv').config();
 const User = require("../models/User.model");
 const admin = require("../firebase");
+const nodemailer = require('nodemailer');
 // const twilio = require("twilio");
 
 // Twilio configuration
@@ -14,105 +15,86 @@ const admin = require("../firebase");
 // Function to generate OTP
 const generateOtp = () => Math.floor(100000 + Math.random() * 900000).toString();
 
-// 1. Create OTP and Send
-// userrouter.post("/create-otp", async (req, res) => {
-//     try {
-//       const { phone } = req.body;
-//       if (!phone) return res.status(400).json({ message: "Phone number is required" });
-  
-//       const otp = generateOtp();
-//       const otpExpires = new Date(Date.now() + 10 * 60 * 1000);
-  
-//       let user = await User.findOne({ phone });
-  
-//       if (!user) {
-//         user = new User({ phone, otp, otpExpires, isVerified: false });
-//       } else {
-//         user.otp = otp;
-//         user.otpExpires = otpExpires;
-//       }
-  
-//       await user.save();
-  
-//       // Send OTP via Twilio
-//       // await twilioClient.messages.create({
-//       //   body: `Your OTP is ${otp}. It will expire in 10 minutes.`,
-//       //   from: TWILIO_PHONE_NUMBER,
-//       //   to: phone,
-//       // });
-  
-//       res.json({ message: "OTP sent successfully" });
-//     } catch (error) {
-//       console.error("Error in create-otp:", error);
-//       res.status(500).json({ message: "Internal server error" });
-//     }
-//   });
-
-// 1. Create OTP and Send via FCM
-userrouter.post("/create-otp", async (req, res) => {
-  const fcmToken="dBvvJDOZB9BmY4yggIEV9p:APA91bE0tes1EI0gNsBPfKU-jtaqJ5xCdtCta7FoS_kub-S6mVwQ2fpk7GS9nX53cAhoEL9fcP46BdDMcNxIS4vIE6OmLtbtIZtD27Y2FlvK2DfxjIr9tzo";
-  try {
-    const { phone } = req.body;
-
-    if (!phone || !fcmToken) {
-      console.log("Phone:", phone, "FCM Token:", fcmToken);
-      return res.status(400).json({ message: "Phone number and FCM token are required" });
-    }
-
-    const otp = generateOtp();
-    const otpExpires = new Date(Date.now() + 10 * 60 * 1000);
-
-    let user = await User.findOne({ phone });
-
-    if (!user) {
-      user = new User({ phone, otp, otpExpires, isVerified: false, fcmToken });
-    } else {
-      user.otp = otp;
-      user.otpExpires = otpExpires;
-      user.fcmToken = fcmToken;
-    }
-
-    await user.save();
-
-    // Send OTP via FCM
-    const message = {
-      notification: {
-        title: "Your OTP Code",
-        body: `Your OTP is ${otp}. It will expire in 10 minutes.`,
-      },
-      token: fcmToken,
-    };
-
-    admin.messaging().send(message)
-      .then(() => {
-        res.json({ message: "OTP sent successfully via FCM",otp });
-        console.log(otp);
-      })
-      .catch((error) => {
-        console.error("FCM Error:", error);
-        if (error.code === "messaging/registration-token-not-registered") {
-          return res.status(400).json({ message: "FCM token is invalid or expired" });
-        }
-        return res.status(500).json({ message: "Error sending OTP via FCM" });
-      });
-
-  } catch (error) {
-    console.error("Error in create-otp:", error);
-    if (!res.headersSent) {
-      res.status(500).json({ message: "Internal server error" });
-    }
-  }
+// Nodemailer Transporter
+const transporter = nodemailer.createTransport({
+  service: "gmail",
+  auth: {
+    user: process.env.EMAIL_USER,
+    pass: process.env.EMAIL_PASS,
+  },
 });
 
+// Function to send OTP via Email
+const sendOtpViaEmail = (email, otp) => {
+  return transporter.sendMail({
+    from: process.env.EMAIL_USER,
+    to: email,
+    subject: "Your OTP Code",
+    text: `Your OTP is ${otp}. It will expire in 5 minutes.`,
+  });
+};
+
+// Function to send OTP via FCM
+const sendOtpViaFCM = (fcmToken, otp) => {
+  return admin.messaging().send({
+    notification: {
+      title: "Your OTP Code",
+      body: `Your OTP is ${otp}. It will expire in 5 minutes.`,
+    },
+    token: fcmToken,
+  });
+};
+
+// API to Create OTP
+userrouter.post("/create-otp", async (req, res) => {
+  try {
+    const { phone, email } = req.body;
+    const fcmToken = "dBvvJDOZB9BmY4yggIEV9p:APA91bE0tes1EI0gNsBPfKU-jtaqJ5xCdtCta7FoS_kub-S6mVwQ2fpk7GS9nX53cAhoEL9fcP46BdDMcNxIS4vIE6OmLtbtIZtD27Y2FlvK2DfxjIr9tzo";
+
+    if (!phone && !email) return res.status(400).json({ message: "Phone or email is required" });
+
+    let user = await User.findOne(phone ? { phone } : { email });
+
+    if (user?.otp && new Date() < new Date(user.otpExpires)) {
+      return res.status(200).json({ message: "OTP already sent. Try again after 5 minutes.", otp: user.otp });
+    }
+
+    // Generate & Update OTP
+    const otp = generateOtp();
+    const otpExpires = new Date(Date.now() + 5 * 60 * 1000);
+
+    if (!user) {
+      user = new User({ phone, email, otp, otpExpires, isVerified: false, fcmToken });
+    } else {
+      Object.assign(user, { otp, otpExpires, fcmToken });
+    }
+    await user.save();
+
+    // Send OTP
+    const sendOtp = phone
+      ? sendOtpViaFCM(fcmToken, otp).then(() => "OTP sent via FCM")
+      : sendOtpViaEmail(email, otp).then(() => "OTP sent via Email");
+
+    sendOtp
+      .then((message) => res.json({ message, otp }))
+      .catch(() => res.status(500).json({ message: "Error sending OTP" }));
+  } catch (error) {
+    console.error("Error in create-otp:", error);
+    res.status(500).json({ message: "Internal server error" });
+  }
+});
 
 // 2. Verify OTP
 userrouter.post("/verify-otp", async (req, res) => {
     try {
-        const { phone, otp } = req.body;
+        const { phone, email, otp } = req.body;
+        console.log("Received request body:", req.body);
 
-        if (!phone || !otp) return res.status(400).json({ message: "Phone and OTP are required" });
+        if ((!phone && !email) || !otp) {
+            return res.status(400).json({ message: "Phone or Email and OTP are required" });
+        }
 
-        const user = await User.findOne({ phone });
+        const user = phone ? await User.findOne({ phone }) : await User.findOne({ email });
 
         if (!user) {
             return res.status(400).json({ message: "User not found" });
@@ -138,26 +120,31 @@ userrouter.post("/verify-otp", async (req, res) => {
     }
 });
 
+
 // 3. Login and Generate JWT Token
 userrouter.post("/login", async (req, res) => {
-    try {
-        const { phone } = req.body;
-        if (!phone) return res.status(400).json({ message: "Phone number is required" });
+  try {
+      const { phone, email } = req.body;
 
-        const user = await User.findOne({ phone });
+      if (!phone && !email) {
+          return res.status(400).json({ message: "Phone or Email is required" });
+      }
 
-        if (!user || !user.isVerified) {
-            return res.status(400).json({ message: "User not verified" });
-        }
+      const user = phone ? await User.findOne({ phone }) : await User.findOne({ email });
 
-        const token = jwt.sign({ phone: user.phone }, process.env.SECRET_KEY, { expiresIn: "1h" });
+      if (!user || !user.isVerified) {
+          return res.status(400).json({ message: "User not verified" });
+      }
 
-        res.json({ message: "Login successful", token });
-    } catch (error) {
-        console.error("Error in login:", error);
-        res.status(500).json({ message: "Internal server error" });
-    }
+      const token = jwt.sign({ id: user._id, phone: user.phone, email: user.email }, process.env.SECRET_KEY, { expiresIn: "1h" });
+
+      res.json({ message: "Login successful", token });
+  } catch (error) {
+      console.error("Error in login:", error);
+      res.status(500).json({ message: "Internal server error" });
+  }
 });
+
 //let blacklistedTokens = new Set();
 // 4. Logout
 userrouter.post("/logout", async (req, res) => {
