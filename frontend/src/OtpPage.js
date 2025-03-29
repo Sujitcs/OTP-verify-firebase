@@ -4,29 +4,30 @@ import axios from "axios";
 import "./otppage.css";
 
 const OtpPage = ({ setUserAuthenticated, setAuthToken }) => {
-  const [inputValue, setInputValue] = useState(""); // Accepts phone or email
+  const [inputValue, setInputValue] = useState("");
   const [otp, setOtp] = useState("");
   const [showOTP, setShowOTP] = useState(false);
   const [loading, setLoading] = useState(false);
   const [receivedOtp, setReceivedOtp] = useState("");
   const [error, setError] = useState("");
 
-  const API_URL = "http://localhost:5000";
+  const API_URL = "https://otp-verify-firebase-fcm-node.onrender.com";
+  //const API_URL = "http://localhost:5000";
 
   // Function to validate phone number or email
   const validateInput = () => {
     const trimmedInput = inputValue.trim();
     if (!trimmedInput) return "Please enter a phone number or an email.";
-  
+
     if (/^\d+$/.test(trimmedInput)) {
-      if (!/^\d{10}$/.test(trimmedInput)) return "Invalid phone number format. Enter a 10-digit number.";
+      if (!/^\d{10}$/.test(trimmedInput))
+        return "Invalid phone number format. Enter a 10-digit number.";
     } else {
       if (!/^\S+@\S+\.\S+$/.test(trimmedInput)) return "Invalid email format.";
     }
-  
     return "";
   };
-  
+
   // Function to handle OTP send
   const onSignup = async () => {
     const validationError = validateInput();
@@ -38,8 +39,9 @@ const OtpPage = ({ setUserAuthenticated, setAuthToken }) => {
     setLoading(true);
     setError("");
   
-    const payload = /^\d+$/.test(inputValue)
-      ? { phone: inputValue }  // Send as phone if numeric
+    const isPhoneNumber = /^\d+$/.test(inputValue);
+    const payload = isPhoneNumber
+      ? { phone: inputValue } // Send as phone if numeric
       : { email: inputValue }; // Send as email if non-numeric
   
     try {
@@ -48,19 +50,20 @@ const OtpPage = ({ setUserAuthenticated, setAuthToken }) => {
       });
   
       if (response.data.otp) {
-        setReceivedOtp(response.data.otp);
         setShowOTP(true);
+        setReceivedOtp(isPhoneNumber ? response.data.otp : ""); // Show OTP only for phone
       } else {
         setError("Failed to send OTP. Please try again.");
       }
     } catch (error) {
-      setError(error.response?.data?.message || "An error occurred. Please try again.");
+      setError(
+        error.response?.data?.message || "An error occurred. Please try again."
+      );
     }
   
     setLoading(false);
   };
   
-
   // Function to verify OTP
   const onOTPVerify = async () => {
     try {
@@ -68,36 +71,40 @@ const OtpPage = ({ setUserAuthenticated, setAuthToken }) => {
         setError("Please enter a valid 6-digit OTP.");
         return;
       }
-  
+
       // Construct payload correctly
       const trimmedInput = inputValue.trim();
       let payload = {};
-  
+
       if (/^\d{10}$/.test(trimmedInput)) {
         payload = { phone: trimmedInput, otp };
       } else if (/^\S+@\S+\.\S+$/.test(trimmedInput)) {
         payload = { email: trimmedInput, otp };
       } else {
-        setError("Invalid input format. Please enter a valid phone number or email.");
+        setError(
+          "Invalid input format. Please enter a valid phone number or email."
+        );
         return;
       }
-  
-      console.log("Payload being sent to backend:", payload);
-  
+      //console.log("Payload being sent to backend:", payload);
+
       // Send OTP verification request
       const response = await axios.post(`${API_URL}/api/verify-otp`, payload, {
         headers: { "Content-Type": "application/json" },
       });
-  
+
       console.log("OTP Verification Response:", response.data);
-  
+
       if (response.data?.message === "OTP verified successfully") {
         // Proceed with login
         const loginResponse = await axios.post(`${API_URL}/api/login`, payload);
-  
+
         console.log("Login Response:", loginResponse.data);
-  
-        if (loginResponse.data?.message === "Login successful" && loginResponse.data?.token) {
+
+        if (
+          loginResponse.data?.message === "Login successful" &&
+          loginResponse.data?.token
+        ) {
           localStorage.setItem("authToken", loginResponse.data.token);
           setAuthToken(loginResponse.data.token);
           setUserAuthenticated(true);
@@ -109,13 +116,11 @@ const OtpPage = ({ setUserAuthenticated, setAuthToken }) => {
       }
     } catch (error) {
       console.error("OTP Verification Error:", error);
-      setError(error.response?.data?.message || "An error occurred. Please try again.");
+      setError(
+        error.response?.data?.message || "An error occurred. Please try again."
+      );
     }
   };
-  
-  
-  
-  
 
   return (
     <section className="containerStyle">
@@ -125,8 +130,7 @@ const OtpPage = ({ setUserAuthenticated, setAuthToken }) => {
 
         {showOTP ? (
           <div className="otpContainerStyle">
-            <label>Your OTP is {receivedOtp}</label>
-
+            {receivedOtp && <label>Your OTP is {receivedOtp}</label>}
             <OtpInput
               value={otp}
               onChange={setOtp}
@@ -137,11 +141,19 @@ const OtpPage = ({ setUserAuthenticated, setAuthToken }) => {
             />
 
             <div className="buttonContainer">
-              <button onClick={onOTPVerify} disabled={loading} className="buttonStyle">
+              <button
+                onClick={onOTPVerify}
+                disabled={loading}
+                className="buttonStyle"
+              >
                 {loading ? "Verifying..." : "Verify OTP"}
               </button>
 
-              <button onClick={onSignup} disabled={loading} className="buttonStyle resendButtonStyle">
+              <button
+                onClick={onSignup}
+                disabled={loading}
+                className="buttonStyle resendButtonStyle"
+              >
                 {loading ? "Resending..." : "Resend OTP"}
               </button>
             </div>
@@ -159,7 +171,11 @@ const OtpPage = ({ setUserAuthenticated, setAuthToken }) => {
               minLength={10}
             />
 
-            <button onClick={onSignup} disabled={loading} className="buttonStyle1">
+            <button
+              onClick={onSignup}
+              disabled={loading}
+              className="buttonStyle1"
+            >
               {loading ? "Sending..." : "Send OTP"}
             </button>
           </div>
